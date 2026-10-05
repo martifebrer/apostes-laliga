@@ -1,0 +1,48 @@
+# Credencials -- MAI a git
+kaggle.json
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Config local de Claude Code (específica d'aquesta màquina)
+.claude/
+
+# Fitxers marcats per esborrar (vegeu READ_ME.txt)
+_to_delete/
+
+# Models entrenats (binaris grans, no els versiona git -- es copien al
+# servidor a part, vegeu READ_ME.txt)
+model_rf.joblib
+model_rf_eval.joblib
+
+# Dades brutes de recerca (grans, no fan falta pel flux setmanal en viu)
+data/Matches.csv
+data/game_stats.csv
+data/all_leagues_matches.csv
+data/all_leagues_odds.csv
+data/understat.db
+
+# Estat viu setmanal -- canvia cada cop que es corre actualitza_jornada.py,
+# no és codi. Es copia al servidor a part la primera vegada i després
+# viu NOMÉS allà (vegeu READ_ME.txt).
+data/jornades_recomanacions.xlsx
+data/quotes_laliga.csv
+data/next_fixtures.csv
+data/la_liga_2014_2025_all_matches_final.csv
+data/la_liga_2014_2025_all_matches_final_backup.csv
+
+# Informes HTML generats automàticament (es regeneren soles)
+*_report.html
+seguiment_apostes.html
+comparar_report.html
+sense_estrategia.html
+
+.env
+
+# Sortides exploratories / estat local (no són codi)
+data/outputs/
+simulacio/optimize_estrategia_top5000.csv
+rf_optimization/optimize_prob_output.txt
+estat_equips_final_2526.xlsx

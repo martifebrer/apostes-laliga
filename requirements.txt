@@ -1,0 +1,20 @@
+# Dependències del flux setmanal en viu (automatitzacio/actualitza_jornada.py
+# i tot el que crida: predict_next.py, entrenament_model/features.py+model.py,
+# simulacio/estrategia.py+comparar_cases.py+staking.py).
+#
+# Sense versions fixades a proposit: l'anterior requirements.txt era un
+# `pip freeze` complet de l'entorn de Windows amb Python 3.14 (numpy 2.5,
+# pandas 3.0...) i barrejava ~80 paquets de Jupyter/notebooks que el
+# projecte no fa servir -- si es fixen aquelles versions exactes, `pip
+# install` pot fallar en un servidor Linux amb una versió de Python
+# diferent perque no hi hagi wheel disponible. Deixant nomes un minim
+# raonable, pip tria la versio compatible amb l'entorn on s'instal·li.
+
+pandas>=2.0
+numpy>=1.24
+requests>=2.28
+understatapi>=0.7
+joblib>=1.3
+scikit-learn>=1.3
+openpyxl>=3.1
+matplotlib>=3.7

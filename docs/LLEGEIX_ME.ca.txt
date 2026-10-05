@@ -1,0 +1,246 @@
+====================================================================
+ PROJECTE: Sistema de predicció i apostes La Liga (ML + estratègia)
+====================================================================
+Resum generat automàticament a partir del codi i els comentaris del
+propi projecte (14/07/2026). Escriptura íntegra en català perquè és
+la llengua que fa servir el projecte mateix.
+
+--------------------------------------------------------------------
+1. QUÈ FA AQUEST PROJECTE
+--------------------------------------------------------------------
+És un sistema personal que:
+
+  1. Entrena un model de Machine Learning (RandomForest) que prediu
+     el resultat (Local / Empat / Visitant) de partits de La Liga,
+     a partir de dades d'Understat (xG, PPDA, "deep completions",
+     xPts) i un rating ELO, calculats amb finestres mòbils
+     (forma recent + forma de fons).
+  2. Compara aquestes prediccions amb les quotes reals de cases
+     d'apostes per detectar-hi "edge" (quan el model creu que una
+     opció és més probable del que diu el mercat).
+  3. Ha validat una estratègia d'apostes (Value Local / Contrarian
+     Visitant, staking amb Kelly fraccionat, bankroll compost) amb
+     backtests de diverses temporades.
+  4. Cada setmana ("jornada"), executa aquesta mateixa estratègia EN
+     VIU: baixa quotes noves, actualitza l'històric amb els partits
+     ja jugats, calcula quina aposta recomana per als partits
+     pendents i envia'n un avís al mòbil.
+
+En altres paraules: la part de "recerca" (carpetes entrenament_model,
+simulacio, rf_optimization) és on es va desenvolupar i validar el
+model i l'estratègia; la carpeta "automatitzacio" és la que s'fa
+servir setmana rere setmana un cop tot ja està validat.
+
+--------------------------------------------------------------------
+2. FITXER A CÓRRER CADA JORNADA  ⭐
+--------------------------------------------------------------------
+    automatitzacio/actualitza_jornada.py
+
+Aquest és l'script "d'una tecla" pensat per córrer cada setmana.
+Es pot executar amb:
+
+    python automatitzacio/actualitza_jornada.py
+
+Fa, EN AQUEST ORDRE, els passos del flux setmanal (l'ordre ja NO és
+1-2-3-4-5: primer s'actualitza l'històric, després es confirmen a mà les
+apostes de la setmana anterior, i només llavors es demanen quotes noves):
+
+  Pas 2 - Històric (actualitza_historic.py)
+          Fa scraping d'Understat per trobar partits ja jugats que
+          encara no són a l'històric
+          (data/la_liga_2014_2025_all_matches_final.csv) i els hi
+          afegeix (xG, PPDA, deep, xPts).
+
+  Confirmació manual de les apostes recomanades
+          Per a cada aposta recomanada la setmana anterior que ara ja té
+          resultat disponible (gràcies al pas 2) però que encara no s'ha
+          confirmat si es va jugar de veritat, es pregunta per consola
+          "la vas fer?". Les que es confirmen (full "Apostes", columna
+          "confirmada") passen pel Pas 3 i el Pas 5; la resta s'esborren
+          de la memòria (memoria.esborra_aposta) i NO compten enlloc --
+          ni al seguiment ni a la confiança de l'equip en qüestió --
+          perquè mai es van arribar a jugar.
+
+  Pas 3 - Memòria (memoria.py)
+          Per a les apostes CONFIRMADES que ja s'han jugat, omple el
+          resultat real, actualitza el bankroll i la confiança per
+          equip a data/jornades_recomanacions.xlsx.
+
+  Pas 5 - Seguiment (report_seguiment.py)
+          Regenera seguiment_apostes.html amb l'estat actualitzat:
+          bankroll i evolució de la temporada en curs, apostes
+          pendents/resoltes, resum de temporades anteriors i
+          confiança per equip. Es pot obrir en qualsevol moment sense
+          tornar a córrer res més.
+
+  Pas 1 - Quotes (actualitza_quotes.py)
+          Pregunta per consola de quina jornada es volen les quotes
+          (per defecte suggereix la propera jornada incompleta segons
+          el calendari OFICIAL de la temporada, vegeu automatitzacio/
+          calendari.py i data/calendari_2026_27.csv -- fiable, no és
+          una estimació). Baixa amb The Odds API només les quotes dels
+          partits d'aquesta jornada i les desa a data/quotes_laliga.csv.
+
+  Pas 4 - Recomanació (recomana_viva.py)
+          Amb el model ja entrenat (model_rf_eval.joblib, NO es
+          reentrena) i les features actualitzades, calcula l'edge de
+          cada partit de la jornada triada, ho treu per pantalla,
+          ho apunta a la memòria (pendent de confirmar la setmana
+          vinent) i envia una notificació push al mòbil via ntfy.sh
+          (notifica_ntfy.py) -- amb equips, les meves probabilitats i
+          les de la casa real triada (Betway, vegeu automatitzacio/
+          recomana_viva.py -- Local/Empat/Visitant), quota, tipus
+          d'aposta i import a jugar.
+
+IMPORTANT - Pas previ (només UNA vegada, abans d'usar-lo per
+primer cop):
+
+    python automatitzacio/inicialitza_memoria.py
+
+Aquest script crea data/jornades_recomanacions.xlsx (el fitxer de
+"memòria") sembrant-lo amb el resultat del backtest ja validat
+d'estrategia.py. Un cop creat aquest fitxer, ja no cal tornar a
+córrer inicialitza_memoria.py: només actualitza_jornada.py cada
+setmana.
+
+--------------------------------------------------------------------
+3. ESTRUCTURA DE CARPETES
+--------------------------------------------------------------------
+
+automatitzacio/   -> EL FLUX SETMANAL EN VIU (veure secció 2)
+  actualitza_jornada.py    script principal ("una tecla")
+  actualitza_quotes.py     pas 1: baixa quotes (The Odds API)
+  actualitza_historic.py   pas 2: baixa resultats jugats (Understat)
+  memoria.py                pas 3: llegeix/escriu la memòria (xlsx)
+  inicialitza_memoria.py    crea la memòria la 1a vegada (fer-ho 1 cop)
+  recomana_viva.py          pas 4: calcula l'aposta recomanada
+  predict_next.py           prediu Local/Empat/Visitant amb el model
+  notifica_ntfy.py          envia la notificació push al mòbil
+  report_seguiment.py       pas 5: genera seguiment_apostes.html
+                              (bankroll/apostes de la temporada en curs)
+  equips.py                  fa d'equivalència de noms d'equip entre
+                              fonts (model / The Odds API / SP1 / calendari)
+  calendari.py                calendari OFICIAL de la temporada en curs
+                              (data/calendari_2026_27.csv): saber de
+                              manera FIABLE a quina jornada pertany un
+                              partit, en comptes de comptar partits jugats
+  esborrar.py                  script manual d'exemple per esborrar una
+                              aposta concreta de la memòria (memoria.
+                              esborra_aposta) fora del flux interactiu
+
+entrenament_model/ -> ENTRENAMENT DEL MODEL (RandomForest)
+  features.py       construcció de les features (ELO + rolling
+                     xG/PPDA/deep/xPts, curt i llarg termini)
+  model.py           definició del model (RandomForestClassifier)
+  entrenament.py     walk-forward backtest amb finestra mòbil de
+                     temporades; genera i desa model_rf.joblib
+                     (producció) i model_rf_eval.joblib (avaluació,
+                     sense les 3 últimes temporades) + walkforward_report.html
+  main2.py           variant amb features de forma DUPLICADES
+                     (finestra curta + llarga alhora)
+
+simulacio/         -> BACKTESTS I VALIDACIÓ DE L'ESTRATÈGIA D'APOSTES
+  estrategia.py        ROI de l'estratègia (Value Local / Contrarian
+                        Visitant) amb Kelly fraccionat i bankroll
+                        compost, sobre 3 temporades. Conté totes les
+                        constants calibrades (EDGE_MIN, PROB_MIN,
+                        KELLY_FRACTION, TEAM_CONF_*, etc.) que fa
+                        servir també el flux en viu.
+  estrategia2.py        variant amb confiança per equip SEPARADA per
+                        cada tipus d'aposta (Value Local vs.
+                        Contrarian Visitant)
+  sense_estrategia.py   la mateixa lògica d'apostes però amb stake
+                        fix d'1€ (referència "neutra" sense Kelly)
+  comparar_cases.py     compara les probabilitats del model amb les
+                        de diverses cases d'apostes (comparar_report.html)
+  report_jornades.py    genera els informes HTML agrupats per jornada
+  optimize_estrategia.py grid search dels paràmetres de l'estratègia
+  bootstrap_edge.py     bootstrap estadístic per validar que l'edge
+                        trobat no és soroll
+  staking.py             fórmules de Kelly (kelly_fraction/kelly_stake)
+
+rf_optimization/   -> AJUST D'HIPERPARÀMETRES DEL MODEL
+  optimize_decay.py         cerca el millor "decay" de les rolling +
+                             K de l'ELO (coordinate descent)
+  optimize_probabilitats.py optimització centrada en log loss
+                             (probabilitats ben calibrades)
+  optimize_rf.py             ajust en 2 fases: decay EWM + RandomizedSearchCV
+                             dels hiperparàmetres del RandomForest
+
+data/              -> TOTES LES DADES
+  la_liga_2014_2025_all_matches_final.csv   històric principal de
+                              La Liga (Understat: xG/PPDA/deep/xPts),
+                              es va actualitzant amb actualitza_historic.py
+  la_liga_..._backup.csv     còpia de seguretat de l'anterior
+  all_leagues_matches.csv    històric d'altres lligues (EPL, Serie A,
+                              Bundesliga, Ligue 1...), fet servir per
+                              entrenar amb més dades
+  all_leagues_odds.csv        quotes de totes les lligues
+  Matches.csv / game_stats.csv  dades brutes addicionals (Understat/Kaggle)
+  understat.db                 base de dades local amb dades d'Understat
+  SP1.csv / SP1_2324.csv / SP1_2526.csv   quotes de football-data.co.uk
+                              per temporada
+  quotes_laliga.csv            quotes recopilades en viu (actualitza_quotes.py)
+  WH_2526.csv                   quotes de William Hill (2025-26)
+  jornades.csv                   calendari OFICIAL de jornades de La Liga
+                              (temporades ja tancades, construït a partir
+                              de resultats ja jugats -- no serveix per a
+                              la temporada en curs, vegeu calendari_2026_27.csv)
+  calendari_2026_27.csv          emparellaments OFICIALS (jornada/home_team/
+                              away_team) de la temporada 2026-27, publicats
+                              abans de començar-la -- el fa servir
+                              automatitzacio/calendari.py per saber de
+                              manera fiable a quina jornada pertany un
+                              partit i quins en formen part (reemplaça
+                              l'estimació precària que feia servir abans
+                              actualitza_jornada.py)
+  jornades_recomanacions.xlsx   LA MEMÒRIA EN VIU: apostes fetes,
+                              confiança per equip, bankroll actual
+                              (fulls "Apostes"/"Confianca"/"Resum")
+  next_fixtures.csv             els partits pendents de la propera
+                              jornada (el genera actualitza_jornada.py)
+  outputs/                      gràfics HTML exploratoris antics
+                              (PPDA, eficiència defensiva dels "Big 3"...)
+
+notebooks/, src/   -> buides actualment (sense contingut)
+
+_to_delete/        -> fitxers/enllaços marcats per esborrar
+                     (un HTML temporal i un symlink de cache; es
+                     poden eliminar amb seguretat)
+
+.claude/           -> configuració interna de Claude Code (permisos),
+                     no és contingut del projecte en si
+
+--------------------------------------------------------------------
+4. FITXERS SOLTS A L'ARRAL
+--------------------------------------------------------------------
+  model_rf.joblib          model de PRODUCCIÓ (últimes temporades),
+                            el fa servir predict_next.py / la jornada en viu
+  model_rf_eval.joblib      model d'AVALUACIÓ (sense les 3 últimes
+                            temporades, per als backtests sense fuita
+                            de dades) -- és el que fa servir recomana_viva.py
+  comparar_report.html      informe: model vs. cases d'apostes
+  estrategia2_report.html   informe del backtest d'estrategia2.py
+  sense_estrategia.html     informe del backtest sense staking (1€ fix)
+  roi_report.html           informe de ROI de l'estratègia principal
+  walkforward_report.html   informe del walk-forward backtest (entrenament.py)
+  seguiment_apostes.html    seguiment EN VIU (pas 5): bankroll i apostes
+                            de la temporada en curs -- el regenera
+                            actualitza_jornada.py cada cop que es corre
+  estat_equips_final_2526.xlsx  estat/confiança final dels equips (25-26)
+  requirements.txt          dependències Python del projecte
+  kaggle.json               credencials de l'API de Kaggle -- FITXER
+                            SENSIBLE, no compartir ni pujar a cap lloc públic
+
+--------------------------------------------------------------------
+5. AVISOS IMPORTANTS
+--------------------------------------------------------------------
+  - Les claus (ODDS_API_KEY, NTFY_TOPIC_APOSTES) viuen a un fitxer .env
+    local que git ignora (plantilla: .env.example); mai al codi.
+    kaggle.json també és sensible i també queda fora de git.
+  - Aquest sistema NO garanteix guanys: és un backtest validat amb
+    dades històriques, però els mercats d'apostes poden canviar de
+    comportament. Fes-ne servir els resultats amb cautela.
+  - Recorda: la primera vegada, cal córrer
+    automatitzacio/inicialitza_memoria.py UNA SOLA VEGADA abans de fer
+    servir actualitza_jornada.py setmana rere setmana.
