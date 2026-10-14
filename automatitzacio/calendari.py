@@ -59,8 +59,9 @@ def jornada_de_partit(home_team: str, away_team: str, path: str = CALENDARI_PATH
 
 def jornada_actual_suggerida(history_path: str = HISTORY_PATH, calendari_path: str = CALENDARI_PATH,
                               season: str | None = None) -> int:
-    """Suggereix la propera jornada a jugar-se: la primera (per ordre) que
-    encara NO té TOTS els seus partits a l'històric de resultats jugats.
+    """Suggereix la propera jornada a jugar-se: la primera (per ordre) amb
+    MÉS DE LA MEITAT dels partits encara fora de l'històric de resultats
+    (així un partit ajornat d'una jornada antiga no la manté "oberta").
     Fiable perquè es basa en el calendari OFICIAL (publicat abans de
     començar la temporada) en comptes de comptar partits jugats -- només un
     suggeriment per defecte, l'usuari sempre pot triar una altra jornada."""
@@ -75,6 +76,7 @@ def jornada_actual_suggerida(history_path: str = HISTORY_PATH, calendari_path: s
     for jornada in sorted(cal["jornada"].unique()):
         partits = cal[cal["jornada"] == jornada]
         claus = set(zip(partits["home_team"], partits["away_team"]))
-        if not claus <= claus_jugats:
+        pendents = len(claus - claus_jugats)
+        if pendents * 2 > len(claus):   # més de la meitat per jugar (un ajornat sol no compta)
             return int(jornada)
     return int(cal["jornada"].max()) + 1
